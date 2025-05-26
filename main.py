@@ -17,6 +17,7 @@ def main():
 
     urls = [item["url"] for item in articles_meta]
     url_to_date = {item["url"]: item["date"] for item in articles_meta}
+    url_to_title = {item["url"]: item["title"] for item in articles_meta} 
 
     print(f"[INFO] Crawling full articles from {len(urls)} URLs using {NUM_WORKERS} workers...")
     results, failed = run_parallel_jobs(get_article_body, urls, num_workers=NUM_WORKERS)
@@ -25,6 +26,8 @@ def main():
     for article in results:
         if not article.get("date"):
             article["date"] = url_to_date.get(article["url"], "")
+
+            article["title"] = url_to_title.get(article["url"], "")
 
     print(f"[INFO] Successfully extracted {len(results)} articles.")
     print(f"[INFO] Failed to extract {len(failed)} articles.")

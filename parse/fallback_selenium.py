@@ -54,7 +54,6 @@ def extract_with_selenium(url: str) -> Optional[Dict[str, str]]:
         return None
 
     return {
-        "title": title_text,
         "body": body_text,
         "url": url,
         "date": ""  # fallback이기 때문에 날짜 정보는 비워둠

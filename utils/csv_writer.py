@@ -17,7 +17,8 @@ def save_articles_to_csv(articles: List[Dict[str, str]], output_path: str) -> No
     fieldnames = ["title", "url", "date", "body"]
 
     with open(output_path, mode="w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        
+        writer = csv.DictWriter(f, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL, quotechar='"')
         writer.writeheader()
 
         for article in articles:

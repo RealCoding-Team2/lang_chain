@@ -34,7 +34,6 @@ def get_article_body(url: str) -> Optional[Dict[str, str]]:
         extracted_data = json.loads(extracted)
 
         return {
-            "title": extracted_data.get("title", "").strip(),
             "body": extracted_data.get("text", "").strip(),
             "url": url,
             "date": extracted_data.get("date", "")  # ISO date (optional)

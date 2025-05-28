@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # RAG 시스템 - 상시 실행 API 서비스
+  rag-system:
+    build: ./rag_system
+    container_name: rag-system
+    ports:
+      - "8000:8000"  # 외부에서 접근 가능
+    volumes:
+      - chroma_data:/app/chroma_db  # ChromaDB 데이터 영속성
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Web Crawler - 수동 실행용 (docker-compose run 사용)
+  web-crawler:
+    build: ./web_crawler
+    container_name: web-crawler
+    volumes:
+      - shared_data:/app/output  # 크롤링 결과 공유
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - rag-network
+    profiles:
+      - manual  # 기본 실행에서 제외
+    depends_on:
+      - rag-system
+
+  # Data Pipeline - web-crawler 실행 후 자동 실행
+  data-pipeline:
+    build: ./data_pipeline
+    container_name: data-pipeline
+    volumes:
+      - shared_data:/shared/output  # 크롤링 결과 읽기
+    networks:
+      - rag-network
+    profiles:
+      - manual  # 기본 실행에서 제외
+    depends_on:
+      - rag-system
+      - web-crawler
+
+volumes:
+  # ChromaDB 데이터 영속성
+  chroma_data:
+    driver: local
+  
+  # 크롤러와 파이프라인 간 파일 공유
+  shared_data:
+    driver: local
+
+networks:
+  rag-network:
+    driver: bridge 

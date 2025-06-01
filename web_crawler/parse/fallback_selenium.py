@@ -35,19 +35,39 @@ def extract_with_selenium(url: str) -> Optional[Dict[str, str]]:
         print(f"[Selenium Error] {url}: {e}")
         return None
 
-    # 공통적인 기사 본문/제목 선택자 몇 가지 시도
+    # 공통적인 기사 제목 선택자 몇 가지 시도
     title = (
         soup.find("h1")
         or soup.find("h2")
+        or soup.find("meta", property="og:title")
+        or soup.find("meta", attrs={"name": "title"})
+        or soup.find("div", class_="article-title")
+        or soup.find("div", class_="news-title")
+        or soup.find("header").find("h1") if soup.find("header") else None
     )
+
+    # 공통적인 기사 본문 선택자 몇 가지 시도
     body = (
         soup.find("div", class_="article-body")
         or soup.find("div", class_="content")
         or soup.find("div", id="articleBody")
         or soup.find("article")
+        or soup.find("div", class_="news_article")
+        or soup.find("div", class_="article_txt")
+        or soup.find("div", class_="art_txt")
+        or soup.find("section", class_="article-content")
+        or soup.find("div", class_="view-content")
+        or soup.find("div", class_="article-view")
     )
 
-    title_text = title.get_text(strip=True) if title else ""
+    # 메타 태그에서 title 추출 (fallback)
+    title_text = ""
+    if title:
+        if title.name == "meta":
+            title_text = title.get("content", "")
+        else:
+            title_text = title.get_text(strip=True)
+
     body_text = body.get_text(separator="\n", strip=True) if body else ""
 
     if not body_text:
@@ -56,5 +76,5 @@ def extract_with_selenium(url: str) -> Optional[Dict[str, str]]:
     return {
         "body": body_text,
         "url": url,
-        "date": ""  # fallback이기 때문에 날짜 정보는 비워둠
+        "date": ""  
     }

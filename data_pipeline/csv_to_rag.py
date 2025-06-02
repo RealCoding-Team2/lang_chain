@@ -1,4 +1,5 @@
 import os
+import hashlib
 import pandas as pd
 import requests
 import json
@@ -15,8 +16,12 @@ def csv_to_rag(csv_file_path: str, rag_api_url: str = "http://rag-system:8000"):
     # 문서 생성
     documents = []
     for idx, row in df.iterrows():
+        # URL 기반으로 고유 ID 생성
+        url_hash = hashlib.md5(str(row['url']).encode('utf-8')).hexdigest()
+        doc_id = f"doc_{url_hash}"
+        
         documents.append({
-            'id': f"doc_{idx}",
+            'id': doc_id,
             'text': f"{row['title']}\n{row['body']}",
             'metadata': {
                 'title': str(row['title']),

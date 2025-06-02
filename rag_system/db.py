@@ -1,5 +1,6 @@
 import os
-import openai
+import hashlib
+from openai import OpenAI
 import chromadb
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
@@ -23,7 +24,8 @@ class ChromaVectorDB:
         if not self.openai_api_key:
             raise ValueError("OPENAI_API_KEY 환경변수가 필요합니다.")
         
-        openai.api_key = self.openai_api_key
+        # OpenAI 클라이언트 초기화
+        self.openai_client = OpenAI(api_key=self.openai_api_key)
         
         # Chroma DB 클라이언트 초기화
         self.client = chromadb.PersistentClient(path=persist_directory)
@@ -40,18 +42,69 @@ class ChromaVectorDB:
     def _get_embedding(self, text: str) -> List[float]:
         """OpenAI로 텍스트 임베딩 생성"""
         try:
-            response = openai.Embedding.create(
+            response = self.openai_client.embeddings.create(
                 input=text,
-                model="text-embedding-ada-002"
+                model="text-embedding-3-small"
             )
-            return response['data'][0]['embedding']
+            return response.data[0].embedding
         except Exception as e:
             print(f"임베딩 생성 실패: {e}")
             raise
     
+    def _generate_content_hash(self, text: str) -> str:
+        """텍스트 내용의 해시값 생성"""
+        return hashlib.md5(text.encode('utf-8')).hexdigest()
+    
+    def _check_existing_documents(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """기존 문서와 중복되지 않는 문서들만 필터링"""
+        try:
+            # 기존 문서들의 메타데이터 조회
+            existing_docs = self.collection.get(
+                include=['metadatas']
+            )
+            
+            # 기존 URL과 content_hash 세트 생성
+            existing_urls = set()
+            existing_hashes = set()
+            
+            for metadata in existing_docs['metadatas']:
+                if 'url' in metadata:
+                    existing_urls.add(metadata['url'])
+                if 'content_hash' in metadata:
+                    existing_hashes.add(metadata['content_hash'])
+            
+            # 중복되지 않는 문서들만 필터링
+            unique_documents = []
+            for doc in documents:
+                url = doc.get('metadata', {}).get('url', '')
+                content_hash = self._generate_content_hash(doc['text'])
+                
+                # URL 또는 content_hash가 이미 존재하는지 확인
+                if url and url in existing_urls:
+                    print(f"중복 URL 건너뜀: {url}")
+                    continue
+                
+                if content_hash in existing_hashes:
+                    print(f"중복 내용 건너뜀: {doc.get('metadata', {}).get('title', 'Unknown')}")
+                    continue
+                
+                # content_hash를 메타데이터에 추가
+                if 'metadata' not in doc:
+                    doc['metadata'] = {}
+                doc['metadata']['content_hash'] = content_hash
+                
+                unique_documents.append(doc)
+            
+            print(f"전체 {len(documents)}개 중 {len(unique_documents)}개가 새로운 문서입니다.")
+            return unique_documents
+            
+        except Exception as e:
+            print(f"중복 체크 실패: {e}")
+            return documents  # 에러 시 모든 문서 반환
+    
     def add_documents(self, documents: List[Dict[str, Any]]) -> bool:
         """
-        문서들을 벡터 DB에 추가
+        문서들을 벡터 DB에 추가 (중복 제거)
         
         Args:
             documents: [{"id": str, "text": str, "metadata": dict}] 형태의 문서 리스트
@@ -60,12 +113,19 @@ class ChromaVectorDB:
             성공 여부
         """
         try:
+            # 중복되지 않는 문서들만 필터링
+            unique_documents = self._check_existing_documents(documents)
+            
+            if not unique_documents:
+                print("추가할 새로운 문서가 없습니다.")
+                return True
+            
             ids = []
             texts = []
             embeddings = []
             metadatas = []
             
-            for doc in documents:
+            for doc in unique_documents:
                 # 임베딩 생성
                 embedding = self._get_embedding(doc['text'])
                 
@@ -82,7 +142,7 @@ class ChromaVectorDB:
                 metadatas=metadatas
             )
             
-            print(f"{len(documents)}개 문서 추가 완료")
+            print(f"{len(unique_documents)}개 문서 추가 완료")
             return True
             
         except Exception as e:

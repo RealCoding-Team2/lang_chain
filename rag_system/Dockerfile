@@ -5,6 +5,7 @@ WORKDIR /app
 # 시스템 dependency 설치
 RUN apt-get update && apt-get install -y \
     gcc \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Python dependency 설치

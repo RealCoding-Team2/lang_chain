@@ -29,19 +29,15 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Google Chrome 설치
-RUN curl -sSL https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -o chrome.deb \
-    && dpkg -i chrome.deb || apt-get install -yf \
-    && rm chrome.deb
+# Google Chrome 설치 (2024년 최신 방식)
+RUN curl -LO https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    apt-get update && \
+    apt-get install -y ./google-chrome-stable_current_amd64.deb && \
+    rm google-chrome-stable_current_amd64.deb && \
+    rm -rf /var/lib/apt/lists/*
 
-# ChromeDriver 설치
-RUN CHROME_VERSION=$(google-chrome --version | cut -d " " -f3 | cut -d "." -f1) \
-    && CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_VERSION}") \
-    && wget -O /tmp/chromedriver.zip "https://googlechromelabs.github.io/chrome-for-testing/bin/linux64/chromedriver/${CHROMEDRIVER_VERSION}/chromedriver-linux64.zip" \
-    && unzip /tmp/chromedriver.zip -d /tmp/ \
-    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
-    && chmod +x /usr/local/bin/chromedriver \
-    && rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64
+# ChromeDriver 설치 (selenium manager가 자동으로 처리하므로 제거)
+# 최신 Selenium 버전에서는 ChromeDriver를 자동으로 다운로드하여 관리
 
 # Python 의존성 파일 복사 및 설치
 COPY requirements.txt .

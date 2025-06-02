@@ -20,34 +20,76 @@ services:
       timeout: 10s
       retries: 3
 
-  # Web Crawler - 수동 실행용 (docker-compose run 사용)
+  # Web Crawler - 한 번 실행 후 종료
   web-crawler:
     build: ./web_crawler
     container_name: web-crawler
     volumes:
       - shared_data:/app/output  # 크롤링 결과 공유
+      - ./status:/shared/status   # 완료 상태 공유
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     networks:
       - rag-network
     profiles:
-      - manual  # 기본 실행에서 제외
+      - crawler  # crawler 프로파일로 분리
     depends_on:
-      - rag-system
+      rag-system:
+        condition: service_healthy
+    restart: "no"  # 한 번만 실행
+    command: >
+      sh -c "
+        python main.py &&
+        echo 'success' > /shared/status/crawler_status.txt
+      "
 
-  # Data Pipeline - web-crawler 실행 후 자동 실행
+  # Data Pipeline - web-crawler 완료 대기 후 실행
   data-pipeline:
     build: ./data_pipeline
     container_name: data-pipeline
     volumes:
       - shared_data:/shared/output  # 크롤링 결과 읽기
+      - ./status:/shared/status     # 완료 상태 확인
+    environment:
+      - RAG_SYSTEM_URL=http://rag-system:8000
     networks:
       - rag-network
     profiles:
-      - manual  # 기본 실행에서 제외
+      - crawler  # crawler 프로파일로 분리
     depends_on:
       - rag-system
       - web-crawler
+    restart: "no"  # 한 번만 실행
+    command: >
+      sh -c "
+        echo 'Waiting for web-crawler to complete...'
+        while [ ! -f /shared/status/crawler_status.txt ]; do
+          sleep 5
+          echo 'Still waiting...'
+        done
+        echo 'Web crawler completed. Starting data pipeline...'
+        python csv_to_rag.py &&
+        echo 'success' > /shared/status/pipeline_status.txt
+      "
+
+  # Workflow Controller - 전체 파이프라인 실행
+  workflow:
+    image: alpine:latest
+    container_name: workflow-controller
+    volumes:
+      - ./status:/shared/status
+    profiles:
+      - workflow
+    depends_on:
+      rag-system:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Starting crawler workflow...'
+        mkdir -p /shared/status
+        rm -f /shared/status/*.txt
+        echo 'Workflow started' > /shared/status/workflow_status.txt
+      "
 
 volumes:
   # ChromaDB 데이터 영속성

@@ -11,6 +11,7 @@ services:
       - chroma_data:/app/chroma_db  # ChromaDB 데이터 영속성
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
     networks:
       - rag-network
     restart: unless-stopped
@@ -29,6 +30,7 @@ services:
       - ./status:/shared/status   # 완료 상태 공유
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
     networks:
       - rag-network
     profiles:

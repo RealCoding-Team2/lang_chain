@@ -24,6 +24,10 @@ class ChromaVectorDB:
         if not self.openai_api_key:
             raise ValueError("OPENAI_API_KEY 환경변수가 필요합니다.")
         
+        self.openai_base_url = os.getenv("OPENAI_BASE_URL")
+        if not self.openai_base_url:
+            raise ValueError("OPENAI_BASE_URL 환경변수가 필요합니다.")
+        
         # OpenAI 클라이언트 초기화
         self.openai_client = OpenAI(api_key=self.openai_api_key)
         
